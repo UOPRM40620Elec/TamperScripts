@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Auto post collector cri
-// @namespace    https://github.com/Syfrost/JustWork-Next-Extension
+// @namespace    https://github.com/UOPRM40620Elec/TamperScripts/tree/main
 // @version      4.0
 // @description  Surcouche planner
 // @author       Cedric GEORGES
@@ -11,8 +11,8 @@
 // @connect      10b4c86e6b534f8298e70036f83a50.ff.environment.api.powerplatform.com
 // @connect      *.ff.environment.api.powerplatform.com
 // @connect      *.api.powerplatform.com
-// @updateURL    https://raw.githubusercontent.com/Syfrost/JustWork-Next-Extension/master/tampermonkey/logistiquecollector.user.js
-// @downloadURL  https://raw.githubusercontent.com/Syfrost/JustWork-Next-Extension/master/tampermonkey/logistiquecollector.user.js
+// @updateURL    https://raw.githubusercontent.com/UOPRM40620Elec/TamperScripts/refs/heads/main/AutoCollectorStatus.user.js
+// @downloadURL  https://raw.githubusercontent.com/UOPRM40620Elec/TamperScripts/refs/heads/main/AutoCollectorStatus.user.js
 // ==/UserScript==
 
 (function () {
@@ -87,7 +87,7 @@
     right: 10px;
     display: flex;
     justify-content: flex-end;
-    align-items: flex-start;
+    align-items: flex-end;
     flex-direction: column;
     row-gap: 10px;
 }
