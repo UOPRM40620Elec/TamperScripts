@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Auto Retour LOG
-// @namespace    https://github.com/Syfrost/JustWork-Next-Extension
+// @namespace    https://github.com/UOPRM40620Elec/TamperScripts/tree/main
 // @version      1.1
 // @description  Script pour rebasculer les pièces du compartiment Retour LOG avec webhook
 // @author       Teddy CORBILLON
@@ -11,8 +11,8 @@
 // @connect      10b4c86e6b534f8298e70036f83a50.ff.environment.api.powerplatform.com
 // @connect      *.ff.environment.api.powerplatform.com
 // @connect      *.api.powerplatform.com
-// @updateURL    https://raw.githubusercontent.com/Syfrost/JustWork-Next-Extension/master/tampermonkey/retourlog.user.js
-// @downloadURL  https://raw.githubusercontent.com/Syfrost/JustWork-Next-Extension/master/tampermonkey/retourlog.user.js
+// @updateURL    https://raw.githubusercontent.com/UOPRM40620Elec/TamperScripts/refs/heads/main/RetourLog.user.js
+// @downloadURL  https://raw.githubusercontent.com/UOPRM40620Elec/TamperScripts/refs/heads/main/RetourLog.user.js
 // ==/UserScript==
 
 (function () {
