@@ -182,7 +182,7 @@
 
         const labelsEligibles = [
             'ELECTRONIQUE - 00 - EN ATTENTE',
-            'ELECTRONIQUE - 15 - RETOUR SST - PROD',
+            'ELECTRONIQUE - 14 - RETOUR SST',
             'ELECTRONIQUE - 16 - RETOUR RT',
             'ELECTRONIQUE - 155 - RETOUR COMPOSANT',
             'ELECTRONIQUE - 168 - RETOUR REBUT',
@@ -235,7 +235,7 @@
 
         const labelsEligibles = [
             'ELECTRONIQUE - 00 - EN ATTENTE',
-            'ELECTRONIQUE - 15 - RETOUR SST - PROD',
+            'ELECTRONIQUE - 14 - RETOUR SST',
             'ELECTRONIQUE - 16 - RETOUR RT',
             'ELECTRONIQUE - 155 - RETOUR COMPOSANT',
             'ELECTRONIQUE - 168 - RETOUR REBUT',
@@ -293,10 +293,10 @@
                     idUser: tache.idUser,
                     current_repair_id: tache.numeroReparation
                 }).toString();
-            } else if (labelNormalise === 'ELECTRONIQUE - 15 - RETOUR SST - PROD') {
+            } else if (labelNormalise === 'ELECTRONIQUE - 14 - RETOUR SST') {
                 url = 'https://prod.cloud-collectorplus.mt.sncf.fr/Prm/Reparation/ProcessTransition';
                 payload = new URLSearchParams({
-                    transition_id: '22771',
+                    transition_id: '22767',
                     fromForm: false,
                     idUser: tache.idUser,
                     current_repair_id: tache.numeroReparation
