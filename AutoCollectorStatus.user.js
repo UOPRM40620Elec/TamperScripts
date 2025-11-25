@@ -3,7 +3,7 @@
 // @namespace    https://github.com/UOPRM40620Elec/TamperScripts/tree/main
 // @version      4.0
 // @description  Surcouche planner
-// @author       Cedric GEORGES
+// @author       Cedric GEORGE
 // @match        https://planner.cloud.microsoft/webui/plan/MxiCj9OWB02LWJYhINLPe5YAEB8_/view/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_addStyle
