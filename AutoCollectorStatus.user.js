@@ -296,7 +296,7 @@
             } else if (labelNormalise === 'ELECTRONIQUE - 14 - RETOUR SST') {
                 url = 'https://prod.cloud-collectorplus.mt.sncf.fr/Prm/Reparation/ProcessTransition';
                 payload = new URLSearchParams({
-                    transition_id: '22767',
+                    transition_id: '22766',
                     fromForm: false,
                     idUser: tache.idUser,
                     current_repair_id: tache.numeroReparation
