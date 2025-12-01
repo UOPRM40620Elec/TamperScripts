@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Auto post collector cri
 // @namespace    https://github.com/UOPRM40620Elec/TamperScripts/tree/main
-// @version      4.2
+// @version      4.3
 // @description  Surcouche planner
 // @author       Cedric GEORGE
 // @match        https://planner.cloud.microsoft/webui/plan/MxiCj9OWB02LWJYhINLPe5YAEB8_/view/*
