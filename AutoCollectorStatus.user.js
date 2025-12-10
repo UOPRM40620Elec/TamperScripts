@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Auto post collector cri
 // @namespace    https://github.com/UOPRM40620Elec/TamperScripts/tree/main
-// @version      4.3
-// @description  Surcouche planner
-// @author       Cedric GEORGE
+// @version      4.5
+// @description  Surcouche planner avec gestion redondance SST
+// @author       Cedric GEORGE & Teddy CORBILLON
 // @match        https://planner.cloud.microsoft/webui/plan/MxiCj9OWB02LWJYhINLPe5YAEB8_/view/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_addStyle
@@ -25,6 +25,19 @@
     let liensTraites = []; // tableau pour stocker les liens des tâches traitées avec succès
     let refreshEnCours = 0; // variable globale pour tracker les rafraîchissements
     let totalRefreshAttendu = 0; // total des rafraîchissements attendus
+
+    // Configuration des IDs de transition par Label
+    const configTransitions = {
+        'ELECTRONIQUE - 00 - EN ATTENTE': '26056',
+        'ELECTRONIQUE - 14 - RETOUR SST': '22766', // ID Principal (fallback sur 22767)
+        'ELECTRONIQUE - 16 - RETOUR RT': '22772',
+        'ELECTRONIQUE - 155 - RETOUR COMPOSANT': '26068',
+        'ELECTRONIQUE - 165 - RETOUR SUPPORT': '26060',
+        'ELECTRONIQUE - 168 - RETOUR REBUT': '26069',
+        'ELECTRONIQUE - 011 - RETOUR NORIA LOG': '26055',
+        'ELECTRONIQUE - 001 - A NORIER': '26039',
+        'ELECTRONIQUE - 167 - RETOUR CONTROLE QUALITE': '26067'
+    };
 
 
     if (document.readyState === 'loading') {
@@ -107,9 +120,7 @@
 
 .autocollector__button:hover {
     transform: scale(1.05);
-    /*box-shadow: 0 0 5px rgb(255, 115, 0), 0 0 5px rgb(255, 115, 0), 0 0 5px rgb(255, 115, 0);
-*/
-    }
+}
 
 .autocollector__button-icon {
     display: block;
@@ -120,7 +131,6 @@
     height: 20px;
     border-radius: 0px;
     overflow: hidden;
-    /*background: rgba(0, 0, 0, 0.35);*/
 }
 
 .autocollector__button-text {
@@ -158,6 +168,7 @@
     }
 }
     `);
+
     injecterPoliceMontserrat();
 
     function injecterPoliceMontserrat() {
@@ -180,17 +191,7 @@
         const progressText = progressContainer?.querySelector('.autocollector__progress-text');
         if (!progressContainer || !progressText) return;
 
-        const labelsEligibles = [
-            'ELECTRONIQUE - 00 - EN ATTENTE',
-            'ELECTRONIQUE - 14 - RETOUR SST',
-            'ELECTRONIQUE - 16 - RETOUR RT',
-            'ELECTRONIQUE - 155 - RETOUR COMPOSANT',
-            'ELECTRONIQUE - 168 - RETOUR REBUT',
-            'ELECTRONIQUE - 165 - RETOUR SUPPORT',
-            'ELECTRONIQUE - 011 - RETOUR NORIA LOG',
-            'ELECTRONIQUE - 001 - A NORIER',
-            'ELECTRONIQUE - 167 - RETOUR CONTROLE QUALITE'
-        ].map(normaliserLabel);
+        const labelsEligibles = Object.keys(configTransitions).map(normaliserLabel);
 
         const total = donneesTaches.filter(t =>
                                            labelsEligibles.includes(normaliserLabel(t.label))
@@ -229,29 +230,23 @@
         });
     }
 
+    // ==========================================
+    // CŒUR DU SCRIPT : Logique de traitement
+    // ==========================================
+
     function lancerModeAutoCollector() {
         const progressContainer = document.querySelector('.autocollector__progress');
         const progressText = progressContainer.querySelector('.autocollector__progress-text');
 
-        const labelsEligibles = [
-            'ELECTRONIQUE - 00 - EN ATTENTE',
-            'ELECTRONIQUE - 14 - RETOUR SST',
-            'ELECTRONIQUE - 16 - RETOUR RT',
-            'ELECTRONIQUE - 155 - RETOUR COMPOSANT',
-            'ELECTRONIQUE - 168 - RETOUR REBUT',
-            'ELECTRONIQUE - 165 - RETOUR SUPPORT',
-            'ELECTRONIQUE - 011 - RETOUR NORIA LOG',
-            'ELECTRONIQUE - 001 - A NORIER',
-            'ELECTRONIQUE - 167 - RETOUR CONTROLE QUALITE'
-        ].map(normaliserLabel);
+        const labelsEligibles = Object.keys(configTransitions).map(normaliserLabel);
 
         const tachesAFaire = donneesTaches.filter(t =>
                                                   labelsEligibles.includes(normaliserLabel(t.label))
                                                  );
 
         if (tachesAFaire.length === 0) {
-            // Mode debug : activer pour simuler l'envoi de 3 tâches exemple au webhook
-            const DEBUG_MODE = false; // False pour désactiver le mode debug
+            // Mode debug
+            const DEBUG_MODE = false;
             if (DEBUG_MODE) {
                 alert('Mode debug activé : aucune tâche éligible trouvée, simulation de 3 tâches.');
                 simulerModeDebug();
@@ -266,7 +261,6 @@
         let done = 0;
         let erreurs = 0;
         let postRestants = total;
-        let refreshTermines = 0; // Compteur pour les rafraîchissements terminés
 
         // Réinitialiser la liste des liens traités au début de chaque traitement
         liensTraites = [];
@@ -279,193 +273,123 @@
         postEnCours = total;
         updateAutoCollectorButtonState();
 
-        tachesAFaire.forEach(tache => {
-            let url = '';
-            let payload = null;
-
-            const labelNormalise = normaliserLabel(tache.label);
-
-            if (labelNormalise === 'ELECTRONIQUE - 00 - EN ATTENTE') {
-                url = 'https://prod.cloud-collectorplus.mt.sncf.fr/Prm/Reparation/ProcessTransition';
-                payload = new URLSearchParams({
-                    transition_id: '26056',
-                    fromForm: false,
-                    idUser: tache.idUser,
-                    current_repair_id: tache.numeroReparation
-                }).toString();
-            } else if (labelNormalise === 'ELECTRONIQUE - 14 - RETOUR SST') {
-                url = 'https://prod.cloud-collectorplus.mt.sncf.fr/Prm/Reparation/ProcessTransition';
-                payload = new URLSearchParams({
-                    transition_id: '22767',
-                    fromForm: false,
-                    idUser: tache.idUser,
-                    current_repair_id: tache.numeroReparation
-                }).toString();
-            } else if (labelNormalise === 'ELECTRONIQUE - 16 - RETOUR RT') {
-                url = 'https://prod.cloud-collectorplus.mt.sncf.fr/Prm/Reparation/ProcessTransition';
-                payload = new URLSearchParams({
-                    transition_id: '22772',
-                    fromForm: false,
-                    idUser: tache.idUser,
-                    current_repair_id: tache.numeroReparation
-                }).toString();
-            } else if (labelNormalise === 'ELECTRONIQUE - 155 - RETOUR COMPOSANT') {
-                url = 'https://prod.cloud-collectorplus.mt.sncf.fr/Prm/Reparation/ProcessTransition';
-                payload = new URLSearchParams({
-                    transition_id: '26068',
-                    fromForm: false,
-                    idUser: tache.idUser,
-                    current_repair_id: tache.numeroReparation
-                }).toString();
-            } else if (labelNormalise === 'ELECTRONIQUE - 165 - RETOUR SUPPORT') {
-                url = 'https://prod.cloud-collectorplus.mt.sncf.fr/Prm/Reparation/ProcessTransition';
-                payload = new URLSearchParams({
-                    transition_id: '26060',
-                    fromForm: false,
-                    idUser: tache.idUser,
-                    current_repair_id: tache.numeroReparation
-                }).toString();
-            } else if (labelNormalise === 'ELECTRONIQUE - 168 - RETOUR REBUT') {
-                url = 'https://prod.cloud-collectorplus.mt.sncf.fr/Prm/Reparation/ProcessTransition';
-                payload = new URLSearchParams({
-                    transition_id: '26069',
-                    fromForm: false,
-                    idUser: tache.idUser,
-                    current_repair_id: tache.numeroReparation
-                }).toString();
-            } else if (labelNormalise === 'ELECTRONIQUE - 011 - RETOUR NORIA LOG') {
-                url = 'https://prod.cloud-collectorplus.mt.sncf.fr/Prm/Reparation/ProcessTransition';
-                payload = new URLSearchParams({
-                    transition_id: '26055',
-                    fromForm: false,
-                    idUser: tache.idUser,
-                    current_repair_id: tache.numeroReparation
-                }).toString();
-            } else if (labelNormalise === 'ELECTRONIQUE - 001 - A NORIER') {
-                url = 'https://prod.cloud-collectorplus.mt.sncf.fr/Prm/Reparation/ProcessTransition';
-                payload = new URLSearchParams({
-                    transition_id: '26039',
-                    fromForm: false,
-                    idUser: tache.idUser,
-                    current_repair_id: tache.numeroReparation
-                }).toString();
-            } else if (labelNormalise === 'ELECTRONIQUE - 167 - RETOUR CONTROLE QUALITE') {
-                url = 'https://prod.cloud-collectorplus.mt.sncf.fr/Prm/Reparation/ProcessTransition';
-                payload = new URLSearchParams({
-                    transition_id: '26067',
-                    fromForm: false,
-                    idUser: tache.idUser,
-                    current_repair_id: tache.numeroReparation
-                }).toString();
+        // Fonction pour finaliser le traitement d'une tâche (après succès ou échec final)
+        function finaliserTraitementRequete(isSuccess, tache) {
+            if (isSuccess) {
+                done++;
+                liensTraites.push(tache.lien);
+            } else {
+                erreurs++;
             }
-            GM_xmlhttpRequest({
-                method: 'POST',
-                url: url,
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                data: payload,
-                onload: res => {
-                    if (res.status === 200) {
-                        done++;
-                        // Stocker le lien de la tâche
-                        liensTraites.push(tache.lien);
-                    } else {
-                        erreurs++;
-                    }
-                    postRestants--;
-                    updateProgress();
-                    if (postRestants === 0) {
-                        console.log('🎯 Toutes les requêtes POST terminées. Rafraîchissement en cours...');
-                        console.log('📋 Liste des liens traités avec succès:', liensTraites);
+            postRestants--;
+            updateProgress();
 
-                        // Préparer le rafraîchissement avec compteur
-                        const tachesARefresh = tachesAFaire.filter(tache => liensTraites.includes(tache.lien));
-                        refreshEnCours = tachesARefresh.length;
-                        totalRefreshAttendu = tachesARefresh.length;
+            if (postRestants === 0) {
+                lancerPhaseRafraichissement(tachesAFaire);
+            }
+            postEnCours--;
+            updateAutoCollectorButtonState();
+        }
 
-                        // Si aucune tâche à rafraîchir, vérifier s'il faut appeler le webhook
-                        if (tachesARefresh.length === 0) {
-                            console.log('🎯 Aucune tâche à rafraîchir.');
-                            console.log('📋 Liens traités avec succès:', liensTraites);
+        // --- Boucle sur les tâches ---
+        tachesAFaire.forEach(tache => {
+            const labelNormalise = normaliserLabel(tache.label);
+            const initialId = configTransitions[labelNormalise];
+            const url = 'https://prod.cloud-collectorplus.mt.sncf.fr/Prm/Reparation/ProcessTransition';
 
-                            if (liensTraites.length > 0) {
-                                const tachesTraitees = donneesTaches.filter(t => liensTraites.includes(t.lien));
-                                console.log('📋 Tâches envoyées au webhook:', tachesTraitees);
-                                appelWebhookPowerAutomate(tachesTraitees);
-                            } else {
-                                console.log('❌ Aucune tâche traitée avec succès. Pas d\'appel webhook.');
-                            }
+            // Fonction récursive pour tenter l'envoi avec gestion du fallback SST
+            const tenterEnvoiPost = (transitionId, isRetry = false) => {
+                const payload = new URLSearchParams({
+                    transition_id: transitionId,
+                    fromForm: false,
+                    idUser: tache.idUser,
+                    current_repair_id: tache.numeroReparation
+                }).toString();
 
-                            postEnCours = 0;
-                            updateAutoCollectorButtonState();
-                            return;
+                GM_xmlhttpRequest({
+                    method: 'POST',
+                    url: url,
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    data: payload,
+                    onload: res => {
+                        // Gestion du cas spécifique RETOUR SST (si échec sur le premier ID, tenter le second)
+                        if (res.status !== 200 && labelNormalise === 'ELECTRONIQUE - 14 - RETOUR SST' && !isRetry) {
+                            console.warn(`⚠️ Échec SST avec ID 22766 pour ${tache.numeroReparation}. Tentative auto avec 22767...`);
+                            tenterEnvoiPost('22767', true); // Retry avec l'ID secondaire
+                            return; // On sort pour ne pas compter l'erreur tout de suite
                         }
 
-                        // Rafraîchissement des tâches
-                        setTimeout(() => {
-                            tachesARefresh.forEach(tache => {
-                                const taskCard = document.querySelector(`#idreparation-status-${tache.numeroReparation}`)?.closest('.taskCard');
-                                if (taskCard) {
-                                    const overlay = taskCard.querySelector(`#idreparation-status-${tache.numeroReparation}`);
-                                    if (overlay) {
-                                        overlay.querySelector('.text-collector').textContent = 'Rafraîchissement...';
-                                    }
-                                    testerLienHttp(tache.lien, taskCard, 1, true); // true = mode rafraîchissement
-                                }
-                            });
-                        }, 1000);
-                    }
-                    postEnCours--;
-                    updateAutoCollectorButtonState();
-                },
-                onerror: () => {
-                    erreurs++;
-                    postRestants--;
-                    updateProgress();
-                    if (postRestants === 0) {
-                        console.log('🎯 Toutes les requêtes POST terminées (avec erreurs). Rafraîchissement en cours...');
-                        console.log('📋 Liste des liens traités avec succès:', liensTraites);
-
-                        // Préparer le rafraîchissement avec compteur
-                        const tachesARefresh = tachesAFaire.filter(tache => liensTraites.includes(tache.lien));
-                        refreshEnCours = tachesARefresh.length;
-                        totalRefreshAttendu = tachesARefresh.length;
-
-                        // Si aucune tâche à rafraîchir, vérifier s'il faut appeler le webhook
-                        if (tachesARefresh.length === 0) {
-                            console.log('🎯 Aucune tâche à rafraîchir (erreurs).');
-                            console.log('📋 Liens traités avec succès:', liensTraites);
-
-                            if (liensTraites.length > 0) {
-                                const tachesTraitees = donneesTaches.filter(t => liensTraites.includes(t.lien));
-                                console.log('📋 Tâches envoyées au webhook:', tachesTraitees);
-                                appelWebhookPowerAutomate(tachesTraitees);
-                            } else {
-                                console.log('❌ Aucune tâche traitée avec succès. Pas d\'appel webhook.');
-                            }
-
-                            postEnCours = 0;
-                            updateAutoCollectorButtonState();
+                        // Succès ou Échec définitif
+                        if (res.status === 200) {
+                            finaliserTraitementRequete(true, tache);
+                        } else {
+                            console.error(`❌ Erreur POST pour ${tache.numeroReparation} (ID: ${transitionId}) : Status ${res.status}`);
+                            finaliserTraitementRequete(false, tache);
+                        }
+                    },
+                    onerror: () => {
+                        // Même logique pour erreur réseau sur SST
+                        if (labelNormalise === 'ELECTRONIQUE - 14 - RETOUR SST' && !isRetry) {
+                            console.warn(`⚠️ Erreur réseau SST avec ID 22766. Tentative avec 22767...`);
+                            tenterEnvoiPost('22767', true);
                             return;
                         }
-
-                        setTimeout(() => {
-                            tachesARefresh.forEach(tache => {
-                                const taskCard = document.querySelector(`#idreparation-status-${tache.numeroReparation}`)?.closest('.taskCard');
-                                if (taskCard) {
-                                    const overlay = taskCard.querySelector(`#idreparation-status-${tache.numeroReparation}`);
-                                    if (overlay) {
-                                        overlay.querySelector('.text-collector').textContent = 'Rafraîchissement...';
-                                    }
-                                    testerLienHttp(tache.lien, taskCard, 1, true); // true = mode rafraîchissement
-                                }
-                            });
-                        }, 1000);
+                        console.error(`❌ Erreur Réseau POST pour ${tache.numeroReparation}`);
+                        finaliserTraitementRequete(false, tache);
                     }
-                    postEnCours--;
-                    updateAutoCollectorButtonState();
+                });
+            };
+
+            // Lancement de la première tentative
+            if (initialId) {
+                tenterEnvoiPost(initialId);
+            } else {
+                finaliserTraitementRequete(false, tache);
+            }
+        });
+    }
+
+    // Gestion de la phase de rafraîchissement des cartes
+    function lancerPhaseRafraichissement(tachesAFaire) {
+        console.log('🎯 Toutes les requêtes POST terminées. Analyse pour rafraîchissement...');
+        console.log('📋 Liste des liens traités avec succès:', liensTraites);
+
+        const tachesARefresh = tachesAFaire.filter(tache => liensTraites.includes(tache.lien));
+        refreshEnCours = tachesARefresh.length;
+        totalRefreshAttendu = tachesARefresh.length;
+
+        // Si aucune tâche à rafraîchir
+        if (tachesARefresh.length === 0) {
+            traiterFinDeCycle();
+            return;
+        }
+
+        // Lancer les rafraîchissements
+        setTimeout(() => {
+            tachesARefresh.forEach(tache => {
+                const taskCard = document.querySelector(`#idreparation-status-${tache.numeroReparation}`)?.closest('.taskCard');
+                if (taskCard) {
+                    const overlay = taskCard.querySelector(`#idreparation-status-${tache.numeroReparation}`);
+                    if (overlay) {
+                        overlay.querySelector('.text-collector').textContent = 'Rafraîchissement...';
+                    }
+                    testerLienHttp(tache.lien, taskCard, 1, true); // true = mode rafraîchissement
                 }
             });
-        });
+        }, 1000);
+    }
+
+    // Gestion de la fin de cycle (Webhook)
+    function traiterFinDeCycle() {
+        if (liensTraites.length > 0) {
+            const tachesTraitees = donneesTaches.filter(t => liensTraites.includes(t.lien));
+            console.log('📋 Tâches envoyées au webhook:', tachesTraitees);
+            appelWebhookPowerAutomate(tachesTraitees);
+        } else {
+            console.log('❌ Aucune tâche traitée avec succès. Pas d\'appel webhook.');
+        }
+        postEnCours = 0;
+        updateAutoCollectorButtonState();
     }
 
 
@@ -488,16 +412,12 @@
 
             console.log(`🐛 Simulation GET pour ${lien}`);
 
-            // Simuler l'appel GM_xmlhttpRequest pour extraire les données
             GM_xmlhttpRequest({
                 method: 'GET',
                 url: lien,
                 onload: function (response) {
-                    console.log(`🐛 DEBUG - Réponse pour ${lien}: Status ${response.status}`);
-
                     let tacheSimulee;
                     if (response.status === 200) {
-                        // Extraire vraiment les données comme dans le script de base
                         const html = response.responseText;
                         const parser = new DOMParser();
                         const doc = parser.parseFromString(html, 'text/html');
@@ -505,14 +425,10 @@
                         const label = doc.querySelector('span.label-success');
                         const texteLabel = label?.textContent?.trim() || 'non trouvé';
 
-                        // Récupération du numéro OF (même logique que le script de base)
                         const ofElements = doc.querySelectorAll('span.labelsPRM');
                         let numOF = 'non trouvé';
-
-                        // Chercher le span qui contient exactement "N° OF :"
                         for (const element of ofElements) {
                             if (element.textContent.includes('N° OF :')) {
-                                // Chercher la div suivante qui contient le numéro OF
                                 const parentDiv = element.closest('div');
                                 const nextDiv = parentDiv?.nextElementSibling;
                                 numOF = nextDiv?.textContent?.trim() || 'non trouvé';
@@ -526,7 +442,6 @@
                         const inputUser = doc.getElementById('idUser');
                         const idUser = inputUser?.value?.trim() || 'non trouvé';
 
-                        // Récupération du nom complet utilisateur
                         const userSpan = doc.querySelector('span.user.ellipsis');
                         const userName = userSpan?.getAttribute('title')?.replace(/&nbsp;/g, ' ')?.trim() || 'non trouvé';
 
@@ -539,44 +454,19 @@
                             userName: userName,
                             numOF: numOF
                         };
-
-                        console.log(`🐛 DEBUG - Tâche extraite depuis HTML réel:`);
-                        console.log(`   🔧 Réparation : ${tacheSimulee.numeroReparation}`);
-                        console.log(`   🏷️ Label      : ${tacheSimulee.label}`);
-                        console.log(`   🆔 idSymbole  : ${tacheSimulee.idSymbole}`);
-                        console.log(`   👤 idUser     : ${tacheSimulee.idUser}`);
-                        console.log(`   📋 N° OF      : ${tacheSimulee.numOF}`);
-                        console.log(`   🔗 Lien       : ${tacheSimulee.lien}`);
-
                         tachesSimulees.push(tacheSimulee);
-                    } else {
-                        console.log(`🐛 DEBUG - Erreur HTTP ${response.status} pour ${lien}`);
                     }
-
                     compteurSimulation++;
-
-                    // Quand toutes les simulations GET sont terminées, appeler le webhook
                     if (compteurSimulation === liensExemples.length) {
                         if (tachesSimulees.length > 0) {
-                            console.log('🐛 DEBUG - Simulation terminée, appel du webhook avec les tâches simulées');
-                            console.log('📋 Tâches simulées envoyées au webhook:', tachesSimulees);
                             appelWebhookPowerAutomate(tachesSimulees);
-                        } else {
-                            console.log('🐛 DEBUG - Aucune tâche simulée réussie, pas d\'appel webhook');
                         }
                     }
                 },
                 onerror: function (error) {
-                    console.log(`🐛 DEBUG - Erreur réseau simulée pour ${lien}:`, error);
                     compteurSimulation++;
-
                     if (compteurSimulation === liensExemples.length) {
-                        if (tachesSimulees.length > 0) {
-                            console.log('🐛 DEBUG - Simulation terminée avec erreurs, appel du webhook');
-                            appelWebhookPowerAutomate(tachesSimulees);
-                        } else {
-                            console.log('🐛 DEBUG - Aucune tâche simulée réussie, pas d\'appel webhook');
-                        }
+                         if (tachesSimulees.length > 0) appelWebhookPowerAutomate(tachesSimulees);
                     }
                 }
             });
@@ -584,10 +474,7 @@
     }
 
     function appelWebhookPowerAutomate(tachesTraitees) {
-        // Flag pour utiliser le nom complet au lieu de l'ID utilisateur
-        const idName = true; // Passe à false pour utiliser idUser au lieu du nom complet
-
-        // Préparer les données selon le schéma Power Automate
+        const idName = true;
         const uniqueUsers = [...new Set(tachesTraitees.map(t => idName ? t.userName : t.idUser))]
             .filter(user => user && user !== 'non trouvé' && user.trim() !== '')
             .map(user => user.trim());
@@ -596,7 +483,6 @@
             .filter(of => of && of !== 'non trouvé' && of.trim() !== '')
             .map(of => {
                 const cleaned = of.trim();
-                // S'assurer que l'OF commence par "OF"
                 return cleaned.startsWith('OF') ? cleaned : `OF${cleaned}`;
             });
 
@@ -616,14 +502,10 @@
             data: JSON.stringify(payload),
             onload: response => {
                 if (response.status >= 200 && response.status < 300) {
-                    console.log('✅ Webhook Power Automate appelé avec succès:', response.status);
-                    console.log('📋 Réponse:', response.responseText);
+                    console.log('✅ Webhook Power Automate appelé avec succès');
                 } else {
-                    console.error('❌ Erreur lors de l\'appel du webhook:', response.status, response.responseText);
+                    console.error('❌ Erreur lors de l\'appel du webhook:', response.status);
                 }
-            },
-            onerror: error => {
-                console.error('❌ Erreur réseau lors de l\'appel du webhook:', error);
             }
         });
     }
@@ -677,7 +559,6 @@
                 console.warn(`⚠️ Arrêt forcé : ${currentCount}/${totalAttendu} tâches visibles après ${essais} essais.`);
             } else {
                 previousCount = currentCount;
-                console.log(`🔄 Scroll ${essais}... ${currentCount}/${totalAttendu} tâches visibles`);
             }
         }, 600);
     }
@@ -696,8 +577,6 @@
             method: 'GET',
             url: lien,
             onload: function (response) {
-                console.log(`🔍 Tentative ${tentative} pour [${lien}] → Status HTTP: ${response.status}`);
-
                 const overlay = taskCard.querySelector(`#idreparation-status-${numeroReparation}`);
 
                 if (response.status === 200) {
@@ -708,14 +587,11 @@
                     const label = doc.querySelector('span.label-success');
                     const texteLabel = label?.textContent?.trim() || 'non trouvé';
 
-                    // Récupération du numéro OF
                     const ofElements = doc.querySelectorAll('span.labelsPRM');
                     let numOF = 'non trouvé';
 
-                    // Chercher le span qui contient exactement "N° OF :"
                     for (const element of ofElements) {
                         if (element.textContent.includes('N° OF :')) {
-                            // Chercher la div suivante qui contient le numéro OF
                             const parentDiv = element.closest('div');
                             const nextDiv = parentDiv?.nextElementSibling;
                             numOF = nextDiv?.textContent?.trim() || 'non trouvé';
@@ -729,7 +605,6 @@
                     const inputUser = doc.getElementById('idUser');
                     const idUser = inputUser?.value?.trim() || 'non trouvé';
 
-                    // Récupération du nom complet utilisateur
                     const userSpan = doc.querySelector('span.user.ellipsis');
                     const userName = userSpan?.getAttribute('title')?.replace(/&nbsp;/g, ' ')?.trim() || 'non trouvé';
 
@@ -746,21 +621,11 @@
 
                     if (index !== -1) {
                         donneesTaches[index] = nouvelleTache;
-                        console.log(`♻️ Tâche ${numeroReparation} mise à jour`);
                     } else {
                         donneesTaches.push(nouvelleTache);
-                        console.log(`➕ Nouvelle tâche ${numeroReparation} ajoutée`);
                     }
 
                     updateProgressBarFromDonneesTaches();
-
-                    console.log(`✅ Tâche analysée :`);
-                    console.log(`   🔧 Réparation : ${numeroReparation}`);
-                    console.log(`   🏷️ Label      : ${texteLabel}`);
-                    console.log(`   🆔 idSymbole  : ${symbole}`);
-                    console.log(`   👤 idUser     : ${idUser}`);
-                    console.log(`   � N° OF      : ${numOF}`);
-                    console.log(`   �🔗 Lien       : ${lien}`);
 
                     if (overlay) {
                         overlay.querySelector('.text-collector').textContent = texteLabel;
@@ -768,29 +633,16 @@
                         overlay.classList.remove('http-error');
                     }
 
-                    // Fin du traitement réussi
                     liensEnCours = Math.max(0, liensEnCours - 1);
 
-                    // Si c'est un rafraîchissement, décrémenter le compteur
+                    // Si c'est un rafraîchissement
                     if (modeRefresh) {
                         refreshEnCours--;
-                        console.log(`🔄 Rafraîchissement ${totalRefreshAttendu - refreshEnCours}/${totalRefreshAttendu} terminé`);
-
-                        // Si tous les rafraîchissements sont terminés, vérifier s'il faut appeler le webhook
                         if (refreshEnCours === 0) {
-                            console.log('🎯 Tous les rafraîchissements terminés !');
-                            console.log('📋 Liens traités avec succès:', liensTraites);
-
-                            if (liensTraites.length > 0) {
-                                const tachesTraitees = donneesTaches.filter(t => liensTraites.includes(t.lien));
-                                console.log('📋 Tâches envoyées au webhook:', tachesTraitees);
-                                appelWebhookPowerAutomate(tachesTraitees);
-                            } else {
-                                console.log('❌ Aucune tâche traitée avec succès. Pas d\'appel webhook.');
-                            }
+                            console.log('🎯 Rafraîchissement terminé. Passage au Webhook.');
+                            traiterFinDeCycle();
                         }
                     }
-
                     updateAutoCollectorButtonState();
 
                 } else {
@@ -808,29 +660,13 @@
                             testerLienHttp(lien, taskCard, tentative + 1, modeRefresh);
                         }, 2000);
                     } else {
-                        console.warn(`❌ Échec après ${maxTentatives} tentatives pour ${lien}`);
                         liensEnCours = Math.max(0, liensEnCours - 1);
-
-                        // Si c'est un rafraîchissement, décrémenter le compteur même en cas d'erreur
                         if (modeRefresh) {
                             refreshEnCours--;
-                            console.log(`❌ Rafraîchissement ${totalRefreshAttendu - refreshEnCours}/${totalRefreshAttendu} échoué`);
-
-                            // Si tous les rafraîchissements sont terminés (même avec erreurs), vérifier s'il faut appeler le webhook
                             if (refreshEnCours === 0) {
-                                console.log('🎯 Tous les rafraîchissements terminés (avec erreurs) !');
-                                console.log('📋 Liens traités avec succès:', liensTraites);
-
-                                if (liensTraites.length > 0) {
-                                    const tachesTraitees = donneesTaches.filter(t => liensTraites.includes(t.lien));
-                                    console.log('📋 Tâches envoyées au webhook:', tachesTraitees);
-                                    appelWebhookPowerAutomate(tachesTraitees);
-                                } else {
-                                    console.log('❌ Aucune tâche traitée avec succès. Pas d\'appel webhook.');
-                                }
+                                traiterFinDeCycle();
                             }
                         }
-
                         updateAutoCollectorButtonState();
                     }
                 }
@@ -852,38 +688,18 @@
                         testerLienHttp(lien, taskCard, tentative + 1, modeRefresh);
                     }, 2000);
                 } else {
-                    console.error(`❌ Échec réseau après ${maxTentatives} tentatives :`, error);
                     liensEnCours = Math.max(0, liensEnCours - 1);
-
-                    // Si c'est un rafraîchissement, décrémenter le compteur même en cas d'erreur réseau
                     if (modeRefresh) {
                         refreshEnCours--;
-                        console.log(`❌ Rafraîchissement ${totalRefreshAttendu - refreshEnCours}/${totalRefreshAttendu} échoué (réseau)`);
-
-                        // Si tous les rafraîchissements sont terminés (même avec erreurs), vérifier s'il faut appeler le webhook
                         if (refreshEnCours === 0) {
-                            console.log('🎯 Tous les rafraîchissements terminés (avec erreurs réseau) !');
-                            console.log('📋 Liens traités avec succès:', liensTraites);
-
-                            if (liensTraites.length > 0) {
-                                const tachesTraitees = donneesTaches.filter(t => liensTraites.includes(t.lien));
-                                console.log('📋 Tâches envoyées au webhook:', tachesTraitees);
-                                appelWebhookPowerAutomate(tachesTraitees);
-                            } else {
-                                console.log('❌ Aucune tâche traitée avec succès. Pas d\'appel webhook.');
-                            }
+                            traiterFinDeCycle();
                         }
                     }
-
                     updateAutoCollectorButtonState();
                 }
             }
         });
     }
-
-
-
-
 
 
     function extraireTachesDepuisSection(section) {
@@ -892,11 +708,9 @@
 
         if (titre?.textContent?.trim() !== 'Tâches terminées') return;
 
-        // 🔍 Vérifie si cette section est dans une colonne à exclure
         const colonne = section.closest('.columnContent');
         const titreColonne = colonne?.querySelector('h3')?.textContent?.trim().toUpperCase();
         if (titreColonne === 'INTROUVABLE' || titreColonne === 'MAUVAIS SYMBOLE') {
-            //console.warn(`⛔ Colonne "${titreColonne}" ignorée`);
             return;
         }
 
@@ -908,21 +722,13 @@
             forcerChargementCompletDesTaches(section);
             observerAjoutTachesDansSection(section);
 
-            // Attendre un court instant pour que les tâches se chargent
             setTimeout(() => {
                 const taches = section.querySelectorAll('div.taskBoardCard');
-
-                if (!taches.length) {
-                    console.warn('⚠️ Aucune tâche trouvée dans cette section. Peut-être encore en chargement ou vide.');
-                    return;
-                }
+                if (!taches.length) return;
 
                 taches.forEach(tache => {
                     const taskCard = tache.querySelector('div.taskCard');
-                    if (!taskCard) {
-                        console.warn('❌ taskCard manquant pour une tâche détectée.');
-                        return;
-                    }
+                    if (!taskCard) return;
 
                     const lienElement = taskCard.querySelector('a.referencePreviewDescription');
                     let lien = lienElement?.getAttribute('title')?.trim();
@@ -931,30 +737,23 @@
                     }
 
                     if (lien) {
-                        console.log('📝 Tâche détectée avec lien :', lien);
                         const numeroReparation = lien.match(/\/(\d+)(?:\.html)?$/)?.[1] || 'inconnu';
                         ajouterOverlayTaskCard(taskCard, numeroReparation, 'Chargement...');
                         testerLienHttp(lien, taskCard);
-                    } else {
-                        console.warn('❌ Lien manquant (balise <a> absente ou invalide) dans cette taskCard.');
                     }
                 });
-            }, 500); // ← délai ajustable (500ms est souvent suffisant)
+            }, 500);
         }
 
         if (!estOuvert && processedSections.get(section)) {
-            console.log('🔁 Section refermée. Réinitialisation autorisée.');
             processedSections.set(section, false);
         }
     }
-
-
 
     function ajouterOverlayTaskCard(taskCard, numeroReparation, texteLabel = 'Chargement...') {
         const thumbnail = taskCard.querySelector('.thumbnail.placeholder');
         if (!thumbnail) return;
 
-        // Supprime s’il existe déjà (évite doublons)
         const existing = thumbnail.querySelector('.autoelement');
         if (existing) existing.remove();
 
@@ -988,7 +787,7 @@
         </span>
     `;
 
-        thumbnail.style.position = 'relative'; // obligatoire pour absolute
+        thumbnail.style.position = 'relative';
         thumbnail.appendChild(container);
     }
 
@@ -1002,9 +801,6 @@
                     ) {
                         const titre = node.querySelector('h4.toggleText')?.textContent?.trim();
                         if (titre === 'Tâches terminées') {
-                            console.log('🗑️ Section "Tâches terminées" retirée du DOM');
-
-                            // Supprimer toutes les tâches associées à cette section
                             const cards = node.querySelectorAll('div.taskBoardCard');
                             cards.forEach(card => {
                                 const lien = card.querySelector('span.previewCaption')?.textContent?.trim();
@@ -1013,7 +809,6 @@
                                     const index = donneesTaches.findIndex(t => t.numeroReparation === numero);
                                     if (index !== -1) {
                                         donneesTaches.splice(index, 1);
-                                        console.log(`🗑️ Tâche ${numero} supprimée (section supprimée)`);
                                     }
                                 }
                             });
@@ -1027,8 +822,6 @@
             childList: true,
             subtree: true
         });
-
-        console.log('👁️ Observer global actif pour suppression de sections "Tâches terminées".');
     }
 
 
@@ -1038,8 +831,6 @@
 
         const observer = new MutationObserver((mutations) => {
             mutations.forEach(mutation => {
-
-                // ✅ Tâches ajoutées dynamiquement
                 mutation.addedNodes.forEach(node => {
                     if (node.nodeType === 1 && node.matches('.taskBoardCard')) {
                         const taskCard = node.querySelector('div.taskCard');
@@ -1053,31 +844,25 @@
                         const numeroReparation = lien?.match(/\/(\d+)\.html$/)?.[1];
 
                         if (lien && numeroReparation) {
-                            console.log('🆕 Nouvelle tâche ajoutée dynamiquement :', lien);
                             ajouterOverlayTaskCard(taskCard, numeroReparation, 'Chargement...');
                             testerLienHttp(lien, taskCard);
                         }
                     }
                 });
 
-                // 🗑️ Tâches supprimées dynamiquement
                 mutation.removedNodes.forEach(node => {
                     if (node.nodeType === 1 && node.matches('.taskBoardCard')) {
                         const taskCard = node.querySelector('div.taskCard');
                         if (!taskCard) return;
-
                         const lienElement = taskCard.querySelector('a.referencePreviewDescription');
                         let lien = lienElement?.getAttribute('title')?.trim();
-                        if (lien && !lien.endsWith('.html')) {
-                            lien += '.html';
-                        }
+                        if (lien && !lien.endsWith('.html')) lien += '.html';
                         const numeroReparation = lien?.match(/\/(\d+)\.html$/)?.[1];
 
                         if (numeroReparation) {
                             const index = donneesTaches.findIndex(t => t.numeroReparation === numeroReparation);
                             if (index !== -1) {
                                 donneesTaches.splice(index, 1);
-                                console.log(`🗑️ Tâche retirée : ${numeroReparation} supprimée de donneesTaches`);
                             }
                         }
                     }
@@ -1090,8 +875,6 @@
             childList: true,
             subtree: true
         });
-
-        console.log('👀 Observer actif sur ajouts/suppressions dynamiques dans cette section "Tâches terminées".');
     }
 
     function observerOuvertureSections() {
@@ -1116,8 +899,6 @@
             attributes: true,
             attributeFilter: ['aria-expanded'],
         });
-
-        console.log('[Planner Script] Observer actif pour surveiller les ouvertures.');
     }
 
     setTimeout(() => {
